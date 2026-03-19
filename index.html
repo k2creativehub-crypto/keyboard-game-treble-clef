@@ -57,7 +57,6 @@
     padding: 9px 14px; margin-bottom: 10px;
     font-size: clamp(13px,3.8vw,17px); font-weight: 500; color: #c53030; letter-spacing: .4px;
   }
-  /* Done screen */
   .done {
     background: white; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,.13);
     padding: 40px 28px; text-align: center; max-width: 360px; width: 100%;
@@ -91,9 +90,10 @@ const NOTES = [
 ];
 const NOTE_NAMES = ["До","Ре","Ми","Фа","Соль","Ля","Си"];
 const PC_MAP = {55:4,57:5,59:6,60:0,62:1,64:2,65:3,67:4,69:5,71:6,81:5,83:6,84:0,86:1};
-const SESSION = 10, HINT_AT = 3;
 const WHITE_PCS = [0,1,2,3,4,5,6];
-const BLACK_LEFT = [0,1,3,4,5]; // index of white key to left
+const BLACK_LEFT = [0,1,3,4,5];
+const SESSION = 10, HINT_AT = 3;
+const NS = "http://www.w3.org/2000/svg";
 
 let queue=[], qIdx=0, step=1, score=0, streak=0, wrongCount=0, hint=false;
 let pressedPc=null, pianoFeedback=null, nameOptions=[], selectedName=null, nameFeedback=null;
@@ -103,83 +103,69 @@ function shuffle(a){ return [...a].sort(()=>Math.random()-.5); }
 function buildQueue(){ return shuffle(NOTES).slice(0,SESSION); }
 function current(){ return queue[qIdx]; }
 function correctPc(){ return PC_MAP[current().midi]; }
-
 function genOptions(note){
   const others = shuffle(NOTE_NAMES.filter(n=>n!==note.name)).slice(0,3);
   return shuffle([note.name,...others]);
 }
 
-// ── SVG helpers ──────────────────────────────────────────────
-const NS = "http://www.w3.org/2000/svg";
-function el(tag, attrs={}){
-  const e = document.createElementNS(NS,tag);
-  for(const[k,v] of Object.entries(attrs)) e.setAttribute(k,v);
+function svgEl(tag, attrs){
+  const e = document.createElementNS(NS, tag);
+  for(const[k,v] of Object.entries(attrs)) e.setAttribute(k,String(v));
   return e;
 }
 
 function buildStaff(note){
-  const W=300, ls=20, hs=10, bottomY=155;
-  const staffColor="#4a5568";
-  const posY = sp => bottomY-(sp-2)*hs;
-  const noteY = posY(note.staffPos);
-  const noteX = W/2+10;
+  // уменьшенный viewBox для правильных пропорций на мобайле
+  const W=300, ls=16, hs=8, botY=128, sc="#4a5568";
+  const posY = sp => botY-(sp-2)*hs;
+  const ny=posY(note.staffPos), nx=W/2+10;
   const rx=hs*1.29, ry=hs*1.01;
-  const stemUp = note.staffPos < 6;
-  const stemX = stemUp ? noteX+rx-1 : noteX-rx+1;
+  const up = note.staffPos < 6;
+  const sx = up ? nx+rx-1 : nx-rx+1;
 
-  const svg = el("svg",{viewBox:`0 0 ${W} 220`,xmlns:NS});
+  const svg = svgEl("svg",{viewBox:`0 0 ${W} 170`,xmlns:NS});
 
-  // Clef
-  const clef = el("text",{x:14, y:posY(2)-ls+22, "font-size":132, "font-family":"serif", fill:staffColor});
+  const clef = svgEl("text",{x:14, y:posY(2)-ls+10, "font-size":86, "font-family":"serif", fill:sc});
   clef.style.userSelect="none";
   clef.textContent="𝄞";
   svg.appendChild(clef);
 
-  // Staff lines
-  [2,4,6,8,10].forEach(sp=>{
-    svg.appendChild(el("line",{x1:14,x2:W-14,y1:posY(sp),y2:posY(sp),stroke:staffColor,"stroke-width":1.5}));
-  });
+  [2,4,6,8,10].forEach(sp=>
+    svg.appendChild(svgEl("line",{x1:14,x2:W-14,y1:posY(sp),y2:posY(sp),stroke:sc,"stroke-width":1.5}))
+  );
 
-  // Ledger lines below
-  if(note.staffPos<=0){
+  if(note.staffPos<=0)
     for(let sp=0;sp>=note.staffPos;sp-=2)
-      svg.appendChild(el("line",{x1:noteX-rx-6,x2:noteX+rx+6,y1:posY(sp),y2:posY(sp),stroke:staffColor,"stroke-width":1.5}));
-  }
-  // Ledger lines above
-  if(note.staffPos>=12){
-    for(let sp=12;sp<=note.staffPos;sp+=2)
-      svg.appendChild(el("line",{x1:noteX-rx-6,x2:noteX+rx+6,y1:posY(sp),y2:posY(sp),stroke:staffColor,"stroke-width":1.5}));
-  }
+      svg.appendChild(svgEl("line",{x1:nx-rx-6,x2:nx+rx+6,y1:posY(sp),y2:posY(sp),stroke:sc,"stroke-width":1.5}));
 
-  // Stem
-  svg.appendChild(el("line",{x1:stemX,x2:stemX,y1:noteY,y2:stemUp?noteY-ls*3:noteY+ls*3,stroke:"#1a202c","stroke-width":2}));
-  // Head
-  const head = el("ellipse",{cx:noteX,cy:noteY,rx,ry,fill:"#1a202c",transform:`rotate(-12,${noteX},${noteY})`});
-  svg.appendChild(head);
+  if(note.staffPos>=12)
+    for(let sp=12;sp<=note.staffPos;sp+=2)
+      svg.appendChild(svgEl("line",{x1:nx-rx-6,x2:nx+rx+6,y1:posY(sp),y2:posY(sp),stroke:sc,"stroke-width":1.5}));
+
+  svg.appendChild(svgEl("line",{x1:sx,x2:sx,y1:ny,y2:up?ny-ls*3:ny+ls*3,stroke:"#1a202c","stroke-width":2}));
+  svg.appendChild(svgEl("ellipse",{cx:nx,cy:ny,rx:rx,ry:ry,fill:"#1a202c",transform:`rotate(-12,${nx},${ny})`}));
   return svg;
 }
 
 function buildPiano(){
-  const nW=7, wW=100, wH=260, bW=60, bH=160, totalW=nW*wW;
-  const svg = el("svg",{viewBox:`0 0 ${totalW} ${wH+10}`,xmlns:NS});
+  const nW=7, wW=100, wH=260, bW=60, bH=160;
+  const svg = svgEl("svg",{viewBox:`0 0 ${nW*wW} ${wH+10}`,xmlns:NS});
   svg.style.touchAction="manipulation";
 
-  // White keys
   WHITE_PCS.forEach((pc,i)=>{
     let fill="#fff";
     if(pressedPc===pc) fill = pianoFeedback==="correct"?"#68d391":"#fc8181";
-    const r = el("rect",{x:i*wW+1,y:0,width:wW-2,height:wH,fill,stroke:"#718096","stroke-width":2,rx:5});
-    const g = el("g"); g.style.cursor="pointer";
+    const r = svgEl("rect",{x:i*wW+1,y:0,width:wW-2,height:wH,fill,stroke:"#718096","stroke-width":2,rx:5});
+    const g = svgEl("g",{}); g.style.cursor="pointer";
     g.appendChild(r);
     g.addEventListener("click",()=>onPianoPress(pc));
     g.addEventListener("touchend",e=>{e.preventDefault();onPianoPress(pc);});
     svg.appendChild(g);
   });
 
-  // Black keys
   BLACK_LEFT.forEach(li=>{
-    const r = el("rect",{x:li*wW+wW-bW/2,y:0,width:bW,height:bH,fill:"#2d3748",stroke:"#1a202c","stroke-width":1.5,rx:4});
-    const g = el("g"); g.style.cursor="pointer";
+    const r = svgEl("rect",{x:li*wW+wW-bW/2,y:0,width:bW,height:bH,fill:"#2d3748",stroke:"#1a202c","stroke-width":1.5,rx:4});
+    const g = svgEl("g",{}); g.style.cursor="pointer";
     g.appendChild(r);
     g.addEventListener("click",()=>onPianoPress(-1));
     g.addEventListener("touchend",e=>{e.preventDefault();onPianoPress(-1);});
@@ -188,25 +174,20 @@ function buildPiano(){
   return svg;
 }
 
-// ── Game logic ────────────────────────────────────────────────
 function onPianoPress(pc){
   if(step!==1||pianoFeedback!==null) return;
   pressedPc=pc;
   if(pc===correctPc()){
-    pianoFeedback="correct";
-    render();
+    pianoFeedback="correct"; render();
     clearTimeout(pianoTimer);
     pianoTimer=setTimeout(()=>{
       step=2; nameOptions=genOptions(current());
-      pressedPc=null; pianoFeedback=null; wrongCount=0; hint=false;
-      render();
+      pressedPc=null; pianoFeedback=null; wrongCount=0; hint=false; render();
     },600);
   } else {
-    pianoFeedback="wrong";
-    wrongCount++;
+    pianoFeedback="wrong"; wrongCount++;
     if(wrongCount>=HINT_AT) hint=true;
-    streak=0;
-    render();
+    streak=0; render();
     clearTimeout(pianoTimer);
     pianoTimer=setTimeout(()=>{ pressedPc=null; pianoFeedback=null; render(); },700);
   }
@@ -216,16 +197,14 @@ function onNamePress(name){
   if(nameFeedback==="correct") return;
   selectedName=name;
   if(name===current().name){
-    nameFeedback="correct"; score++; streak++;
-    render();
+    nameFeedback="correct"; score++; streak++; render();
     clearTimeout(nameTimer);
     nameTimer=setTimeout(()=>{
       qIdx++;
       if(qIdx>=SESSION){ renderDone(); return; }
       step=1; pressedPc=null; pianoFeedback=null;
       nameOptions=[]; selectedName=null; nameFeedback=null;
-      wrongCount=0; hint=false;
-      render();
+      wrongCount=0; hint=false; render();
     },900);
   } else {
     nameFeedback="wrong"; streak=0; wrongCount++;
@@ -243,7 +222,6 @@ function restart(){
   render();
 }
 
-// ── Render ────────────────────────────────────────────────────
 function render(){
   document.body.innerHTML="";
 
@@ -251,39 +229,31 @@ function render(){
   h1.textContent="🎵 Учим ноты";
   document.body.appendChild(h1);
 
-  // Stats
-  const stats=document.createElement("div");
-  stats.className="stats";
+  const stats=document.createElement("div"); stats.className="stats";
   stats.innerHTML=`<span class="correct">✓ ${score}</span><span class="streak">🔥 ${streak}</span>`;
   document.body.appendChild(stats);
 
-  // Progress
   const pw=document.createElement("div"); pw.className="progress-wrap";
   pw.innerHTML=`<div class="progress-label"><span>Прогресс</span><span>${qIdx+1} из ${SESSION}</span></div>
     <div class="progress-bar"><div class="progress-fill" style="width:${(qIdx/SESSION)*100}%"></div></div>`;
   document.body.appendChild(pw);
 
-  // Card
   const card=document.createElement("div"); card.className="card";
 
-  // Step dots
   const dots=document.createElement("div"); dots.className="steps";
   [1,2].forEach(s=>{ const d=document.createElement("div"); d.className="step-dot"+(step>=s?" active":""); dots.appendChild(d); });
   card.appendChild(dots);
 
-  // Staff
   const sw=document.createElement("div"); sw.className="staff-wrap";
   sw.appendChild(buildStaff(current()));
   card.appendChild(sw);
 
-  // Hint
   if(hint){
     const h=document.createElement("div"); h.className="hint";
     h.innerHTML=`💡 Подсказка: <strong>${current().name}</strong>`;
     card.appendChild(h);
   }
 
-  // Instruction
   const ins=document.createElement("p"); ins.className="instruction";
   ins.textContent=step===1?"Нажми эту ноту на клавиатуре":"Как называется эта нота?";
   card.appendChild(ins);
@@ -297,10 +267,11 @@ function render(){
   if(step===2){
     if(nameFeedback==="wrong"){
       const b=document.createElement("div"); b.className="wrong-banner";
-      b.innerHTML=`<svg width="26" height="26" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#fc8181"/>
+      b.innerHTML=`<svg width="26" height="26" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="13" fill="#fc8181"/>
         <line x1="8" y1="8" x2="20" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="20" y1="8" x2="8" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
-        Нет, попробуй ещё!`;
+        <line x1="20" y1="8" x2="8" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>Нет, попробуй ещё!`;
       card.appendChild(b);
     }
     const grid=document.createElement("div"); grid.className="name-grid";
@@ -320,10 +291,8 @@ function render(){
 
 function renderDone(){
   document.body.innerHTML="";
-  const h1=document.createElement("h1");
-  h1.textContent="🎵 Учим ноты";
+  const h1=document.createElement("h1"); h1.textContent="🎵 Учим ноты";
   document.body.appendChild(h1);
-
   const done=document.createElement("div"); done.className="done";
   done.innerHTML=`<div style="font-size:52px">🎉</div>
     <h2>Сессия завершена!</h2>
@@ -335,7 +304,6 @@ function renderDone(){
   document.body.appendChild(done);
 }
 
-// Init
 queue=buildQueue();
 render();
 </script>
