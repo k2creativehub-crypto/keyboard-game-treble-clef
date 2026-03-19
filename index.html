@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Учим ноты скрипичного ключа</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Oswald', sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #ebf8ff 0%, #e9d8fd 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 12px;
+  }
+  h1 { font-size: clamp(16px, 4vw, 22px); color: #2b6cb0; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 8px; }
+  .stats { display: flex; gap: 20px; font-size: clamp(13px, 3.5vw, 15px); margin-bottom: 10px; }
+  .stats .correct { color: #276749; } .stats .streak { color: #553c9a; }
+  .progress-wrap { width: 100%; max-width: 440px; margin-bottom: 12px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: #718096; margin-bottom: 4px; }
+  .progress-bar { background: #e2e8f0; border-radius: 6px; height: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #2b6cb0; border-radius: 6px; transition: width .4s; }
+  .card {
+    background: white; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,.13);
+    padding: 16px; width: 100%; max-width: 440px;
+  }
+  .steps { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+  .step-dot { height: 6px; border-radius: 3px; background: #e2e8f0; transition: background .3s; flex: 1; max-width: 40px; }
+  .step-dot.active { background: #2b6cb0; }
+  .staff-wrap { width: 100%; }
+  .staff-wrap svg { width: 100%; height: auto; display: block; }
+  .hint {
+    text-align: center; background: #fefcbf; border: 2px solid #f6e05e;
+    border-radius: 10px; padding: 7px 12px; margin: 6px 0 8px;
+    font-size: clamp(13px, 3.5vw, 15px); color: #744210;
+  }
+  .instruction {
+    text-align: center; color: #4a5568; font-size: clamp(13px, 3.5vw, 15px);
+    margin: 6px 0 12px; min-height: 20px; letter-spacing: .4px;
+  }
+  .piano-wrap { width: 100%; touch-action: manipulation; }
+  .piano-wrap svg { width: 100%; height: auto; display: block; }
+  .name-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .name-btn {
+    padding: clamp(10px,3vw,14px) 0; font-size: clamp(16px,4.5vw,20px);
+    font-weight: 600; font-family: 'Oswald', sans-serif; letter-spacing: 1px;
+    border-radius: 12px; cursor: pointer; transition: all .2s;
+    background: #ebf8ff; border: 2px solid #90cdf4; color: #2b6cb0;
+    touch-action: manipulation;
+  }
+  .name-btn.wrong  { background: #fed7d7; border-color: #fc8181; color: #c53030; }
+  .name-btn.correct{ background: #c6f6d5; border-color: #48bb78; color: #276749; }
+  .wrong-banner {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: #fff5f5; border: 2px solid #fc8181; border-radius: 12px;
+    padding: 9px 14px; margin-bottom: 10px;
+    font-size: clamp(13px,3.8vw,17px); font-weight: 500; color: #c53030; letter-spacing: .4px;
+  }
+  /* Done screen */
+  .done {
+    background: white; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,.13);
+    padding: 40px 28px; text-align: center; max-width: 360px; width: 100%;
+  }
+  .done h2 { font-size: clamp(20px,5vw,26px); color: #2b6cb0; margin: 12px 0 8px; }
+  .done p  { font-size: clamp(15px,4vw,18px); color: #4a5568; margin-bottom: 24px; }
+  .restart-btn {
+    padding: 14px 32px; font-size: clamp(15px,4vw,18px); font-weight: 600;
+    font-family: 'Oswald', sans-serif; background: #2b6cb0; color: white;
+    border: none; border-radius: 12px; cursor: pointer; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<script>
+const NOTES = [
+  { name:"Соль", midi:55, staffPos:-3 },
+  { name:"Ля",   midi:57, staffPos:-2 },
+  { name:"Си",   midi:59, staffPos:-1 },
+  { name:"До",   midi:60, staffPos:0  },
+  { name:"Ре",   midi:62, staffPos:1  },
+  { name:"Ми",   midi:64, staffPos:2  },
+  { name:"Фа",   midi:65, staffPos:3  },
+  { name:"Соль", midi:67, staffPos:4  },
+  { name:"Ля",   midi:69, staffPos:5  },
+  { name:"Си",   midi:71, staffPos:6  },
+  { name:"Ля",   midi:81, staffPos:12 },
+  { name:"Си",   midi:83, staffPos:13 },
+  { name:"До",   midi:84, staffPos:14 },
+  { name:"Ре",   midi:86, staffPos:15 },
+];
+const NOTE_NAMES = ["До","Ре","Ми","Фа","Соль","Ля","Си"];
+const PC_MAP = {55:4,57:5,59:6,60:0,62:1,64:2,65:3,67:4,69:5,71:6,81:5,83:6,84:0,86:1};
+const SESSION = 10, HINT_AT = 3;
+const WHITE_PCS = [0,1,2,3,4,5,6];
+const BLACK_LEFT = [0,1,3,4,5]; // index of white key to left
+
+let queue=[], qIdx=0, step=1, score=0, streak=0, wrongCount=0, hint=false;
+let pressedPc=null, pianoFeedback=null, nameOptions=[], selectedName=null, nameFeedback=null;
+let pianoTimer=null, nameTimer=null;
+
+function shuffle(a){ return [...a].sort(()=>Math.random()-.5); }
+function buildQueue(){ return shuffle(NOTES).slice(0,SESSION); }
+function current(){ return queue[qIdx]; }
+function correctPc(){ return PC_MAP[current().midi]; }
+
+function genOptions(note){
+  const others = shuffle(NOTE_NAMES.filter(n=>n!==note.name)).slice(0,3);
+  return shuffle([note.name,...others]);
+}
+
+// ── SVG helpers ──────────────────────────────────────────────
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs={}){
+  const e = document.createElementNS(NS,tag);
+  for(const[k,v] of Object.entries(attrs)) e.setAttribute(k,v);
+  return e;
+}
+
+function buildStaff(note){
+  const W=300, ls=20, hs=10, bottomY=155;
+  const staffColor="#4a5568";
+  const posY = sp => bottomY-(sp-2)*hs;
+  const noteY = posY(note.staffPos);
+  const noteX = W/2+10;
+  const rx=hs*1.29, ry=hs*1.01;
+  const stemUp = note.staffPos < 6;
+  const stemX = stemUp ? noteX+rx-1 : noteX-rx+1;
+
+  const svg = el("svg",{viewBox:`0 0 ${W} 220`,xmlns:NS});
+
+  // Clef
+  const clef = el("text",{x:14, y:posY(2)-ls+22, "font-size":132, "font-family":"serif", fill:staffColor});
+  clef.style.userSelect="none";
+  clef.textContent="𝄞";
+  svg.appendChild(clef);
+
+  // Staff lines
+  [2,4,6,8,10].forEach(sp=>{
+    svg.appendChild(el("line",{x1:14,x2:W-14,y1:posY(sp),y2:posY(sp),stroke:staffColor,"stroke-width":1.5}));
+  });
+
+  // Ledger lines below
+  if(note.staffPos<=0){
+    for(let sp=0;sp>=note.staffPos;sp-=2)
+      svg.appendChild(el("line",{x1:noteX-rx-6,x2:noteX+rx+6,y1:posY(sp),y2:posY(sp),stroke:staffColor,"stroke-width":1.5}));
+  }
+  // Ledger lines above
+  if(note.staffPos>=12){
+    for(let sp=12;sp<=note.staffPos;sp+=2)
+      svg.appendChild(el("line",{x1:noteX-rx-6,x2:noteX+rx+6,y1:posY(sp),y2:posY(sp),stroke:staffColor,"stroke-width":1.5}));
+  }
+
+  // Stem
+  svg.appendChild(el("line",{x1:stemX,x2:stemX,y1:noteY,y2:stemUp?noteY-ls*3:noteY+ls*3,stroke:"#1a202c","stroke-width":2}));
+  // Head
+  const head = el("ellipse",{cx:noteX,cy:noteY,rx,ry,fill:"#1a202c",transform:`rotate(-12,${noteX},${noteY})`});
+  svg.appendChild(head);
+  return svg;
+}
+
+function buildPiano(){
+  const nW=7, wW=100, wH=260, bW=60, bH=160, totalW=nW*wW;
+  const svg = el("svg",{viewBox:`0 0 ${totalW} ${wH+10}`,xmlns:NS});
+  svg.style.touchAction="manipulation";
+
+  // White keys
+  WHITE_PCS.forEach((pc,i)=>{
+    let fill="#fff";
+    if(pressedPc===pc) fill = pianoFeedback==="correct"?"#68d391":"#fc8181";
+    const r = el("rect",{x:i*wW+1,y:0,width:wW-2,height:wH,fill,stroke:"#718096","stroke-width":2,rx:5});
+    const g = el("g"); g.style.cursor="pointer";
+    g.appendChild(r);
+    g.addEventListener("click",()=>onPianoPress(pc));
+    g.addEventListener("touchend",e=>{e.preventDefault();onPianoPress(pc);});
+    svg.appendChild(g);
+  });
+
+  // Black keys
+  BLACK_LEFT.forEach(li=>{
+    const r = el("rect",{x:li*wW+wW-bW/2,y:0,width:bW,height:bH,fill:"#2d3748",stroke:"#1a202c","stroke-width":1.5,rx:4});
+    const g = el("g"); g.style.cursor="pointer";
+    g.appendChild(r);
+    g.addEventListener("click",()=>onPianoPress(-1));
+    g.addEventListener("touchend",e=>{e.preventDefault();onPianoPress(-1);});
+    svg.appendChild(g);
+  });
+  return svg;
+}
+
+// ── Game logic ────────────────────────────────────────────────
+function onPianoPress(pc){
+  if(step!==1||pianoFeedback!==null) return;
+  pressedPc=pc;
+  if(pc===correctPc()){
+    pianoFeedback="correct";
+    render();
+    clearTimeout(pianoTimer);
+    pianoTimer=setTimeout(()=>{
+      step=2; nameOptions=genOptions(current());
+      pressedPc=null; pianoFeedback=null; wrongCount=0; hint=false;
+      render();
+    },600);
+  } else {
+    pianoFeedback="wrong";
+    wrongCount++;
+    if(wrongCount>=HINT_AT) hint=true;
+    streak=0;
+    render();
+    clearTimeout(pianoTimer);
+    pianoTimer=setTimeout(()=>{ pressedPc=null; pianoFeedback=null; render(); },700);
+  }
+}
+
+function onNamePress(name){
+  if(nameFeedback==="correct") return;
+  selectedName=name;
+  if(name===current().name){
+    nameFeedback="correct"; score++; streak++;
+    render();
+    clearTimeout(nameTimer);
+    nameTimer=setTimeout(()=>{
+      qIdx++;
+      if(qIdx>=SESSION){ renderDone(); return; }
+      step=1; pressedPc=null; pianoFeedback=null;
+      nameOptions=[]; selectedName=null; nameFeedback=null;
+      wrongCount=0; hint=false;
+      render();
+    },900);
+  } else {
+    nameFeedback="wrong"; streak=0; wrongCount++;
+    if(wrongCount>=HINT_AT) hint=true;
+    render();
+    clearTimeout(nameTimer);
+    nameTimer=setTimeout(()=>{ selectedName=null; nameFeedback=null; render(); },1000);
+  }
+}
+
+function restart(){
+  queue=buildQueue(); qIdx=0; step=1; score=0; streak=0;
+  pressedPc=null; pianoFeedback=null; nameOptions=[];
+  selectedName=null; nameFeedback=null; wrongCount=0; hint=false;
+  render();
+}
+
+// ── Render ────────────────────────────────────────────────────
+function render(){
+  document.body.innerHTML="";
+
+  const h1=document.createElement("h1");
+  h1.textContent="🎵 Учим ноты";
+  document.body.appendChild(h1);
+
+  // Stats
+  const stats=document.createElement("div");
+  stats.className="stats";
+  stats.innerHTML=`<span class="correct">✓ ${score}</span><span class="streak">🔥 ${streak}</span>`;
+  document.body.appendChild(stats);
+
+  // Progress
+  const pw=document.createElement("div"); pw.className="progress-wrap";
+  pw.innerHTML=`<div class="progress-label"><span>Прогресс</span><span>${qIdx+1} из ${SESSION}</span></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${(qIdx/SESSION)*100}%"></div></div>`;
+  document.body.appendChild(pw);
+
+  // Card
+  const card=document.createElement("div"); card.className="card";
+
+  // Step dots
+  const dots=document.createElement("div"); dots.className="steps";
+  [1,2].forEach(s=>{ const d=document.createElement("div"); d.className="step-dot"+(step>=s?" active":""); dots.appendChild(d); });
+  card.appendChild(dots);
+
+  // Staff
+  const sw=document.createElement("div"); sw.className="staff-wrap";
+  sw.appendChild(buildStaff(current()));
+  card.appendChild(sw);
+
+  // Hint
+  if(hint){
+    const h=document.createElement("div"); h.className="hint";
+    h.innerHTML=`💡 Подсказка: <strong>${current().name}</strong>`;
+    card.appendChild(h);
+  }
+
+  // Instruction
+  const ins=document.createElement("p"); ins.className="instruction";
+  ins.textContent=step===1?"Нажми эту ноту на клавиатуре":"Как называется эта нота?";
+  card.appendChild(ins);
+
+  if(step===1){
+    const pw2=document.createElement("div"); pw2.className="piano-wrap";
+    pw2.appendChild(buildPiano());
+    card.appendChild(pw2);
+  }
+
+  if(step===2){
+    if(nameFeedback==="wrong"){
+      const b=document.createElement("div"); b.className="wrong-banner";
+      b.innerHTML=`<svg width="26" height="26" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#fc8181"/>
+        <line x1="8" y1="8" x2="20" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="20" y1="8" x2="8" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+        Нет, попробуй ещё!`;
+      card.appendChild(b);
+    }
+    const grid=document.createElement("div"); grid.className="name-grid";
+    nameOptions.forEach(name=>{
+      const btn=document.createElement("button"); btn.className="name-btn";
+      if(selectedName===name) btn.classList.add(nameFeedback==="correct"?"correct":"wrong");
+      btn.textContent=name;
+      btn.addEventListener("click",()=>onNamePress(name));
+      btn.addEventListener("touchend",e=>{e.preventDefault();onNamePress(name);});
+      grid.appendChild(btn);
+    });
+    card.appendChild(grid);
+  }
+
+  document.body.appendChild(card);
+}
+
+function renderDone(){
+  document.body.innerHTML="";
+  const h1=document.createElement("h1");
+  h1.textContent="🎵 Учим ноты";
+  document.body.appendChild(h1);
+
+  const done=document.createElement("div"); done.className="done";
+  done.innerHTML=`<div style="font-size:52px">🎉</div>
+    <h2>Сессия завершена!</h2>
+    <p>Правильно: <strong>${score}</strong> из <strong>${SESSION}</strong></p>`;
+  const btn=document.createElement("button"); btn.className="restart-btn";
+  btn.textContent="Ещё раз";
+  btn.addEventListener("click",restart);
+  done.appendChild(btn);
+  document.body.appendChild(done);
+}
+
+// Init
+queue=buildQueue();
+render();
+</script>
+</body>
+</html>
